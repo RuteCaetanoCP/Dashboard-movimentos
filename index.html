@@ -57,7 +57,7 @@
     let graficoMovimentos = null;
     let graficoQuantidades = null;
 
-    async function carregarDados() {
+   async function carregarDados() {
         try {
             const resposta = await fetch(`${urlCSV}&cacheBuster=${new Date().getTime()}`);
             const textoCSV = await resposta.text();
@@ -70,7 +70,7 @@
                 return linha.split(separador).map(celula => celula.replace(/"/g, '').trim());
             });
 
-            const cabecalho = linhas[0];
+            const cabecalho = linhas[0]; // Seleciona apenas a primeira linha para o cabeçalho
             const head = document.getElementById('tabela-head');
             const body = document.getElementById('tabela-body');
 
@@ -89,31 +89,20 @@
                 body.innerHTML += htmlLinha;
             }
 
-               const contagemTipos = {};
+            const contagemTipos = {};
             const somaLitros = {};
 
-            // i = 1 para ignorar a linha de cabeçalho
             for (let i = 1; i < linhas.length; i++) {
-                // Garante que a linha existe e tem colunas suficientes
-                if (!linhas[i] || linhas[i].length <= 4) continue;
+                if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
 
                 let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO];
                 let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA];
 
-                // Trata a string para remover espaços ou nulos
-                tipoMov = tipoMov ? tipoMov.trim() : "";
-
-                // Valida se a linha tem um tipo de movimento preenchido
-                if (tipoMov !== "" && tipoMov !== "Selecione...") {
-                    // Contagem de movimentos
+                if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
                     contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
-
-                    // Tratamento e soma de litros
-                    if (qtTexto) {
-                        let textoLimpoQtd = qtTexto.toString().replace(/\s+/g,'').replace(',', '.');
-                        let valorNumerico = parseFloat(textoLimpoQtd) || 0;
-                        somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
-                    }
+                    let textoLimpoQtd = (qtTexto || "").toString().replace(/\s+/g,'').replace(',', '.');
+                    let valorNumerico = parseFloat(textoLimpoQtd) || 0;
+                    somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
                 }
             }
 
@@ -121,13 +110,15 @@
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
-            // Se falhar tudo, injeta um valor de segurança para não quebrar o gráfico
+            // CORREÇÃO: Garante que os arrays contêm dados numéricos (0) para desenhar o eixo
             if (labelsGraficos.length === 0) {
-                labelsGraficos = ["Sem Dados"];
+                labelsGraficos = ["Sem movimentos"];
                 dadosContagem = [0];
                 dadosLitros = [0];
             }
+
             if (typeof Chart !== 'undefined') {
+                // Gráfico 1: Total de Movimentos
                 const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
                 if (graficoMovimentos) graficoMovimentos.destroy();
 
@@ -149,12 +140,13 @@
                         scales: {
                             y: {
                                 beginAtZero: true,
-                                ticks: { stepSize: 1 }
+                                ticks: { precision: 0 }
                             }
                         }
                     }
                 });
 
+                // Gráfico 2: Quantidades Litros
                 const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
                 if (graficoQuantidades) graficoQuantidades.destroy();
 
@@ -190,12 +182,7 @@
             document.getElementById('status').innerText = "Erro ao renderizar painel visual.";
         }
     }
-
-    // Executa a função ao carregar a página
-    carregarDados();
-
-    // Atualiza os dados a cada 30 minutos
-    setInterval(carregarDados, 1800000);
+    
 </script>
 
 
