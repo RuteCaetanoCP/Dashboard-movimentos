@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Produção e Movimentos</title>
-
-    <!-- Link alternativo via UNPKG (Mais compatível com o servidor local do Android Studio) -->
-    <script src="https://unpkg.com"></script>
-
     <style>
         body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
         h1 { margin-bottom: 5px; }
@@ -81,11 +77,31 @@
     // CONFIGURAÇÃO MANUAL
     const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
 
-    const COLUNA_TIPO_MOVIMENTO = 4;
-    const COLUNA_QT_TRASFEGADA = 13;
+    // Configuração correta com base na sua tabela real
+    const COLUNA_TIPO_MOVIMENTO = 4; // Tipo Movimento é a coluna 5 (índice 4)
+    const COLUNA_QT_TRASFEGADA = 13; // Qt Trasfegada é a coluna 14 (índice 13)
 
     let graficoMovimentos = null;
     let graficoQuantidades = null;
+
+    // INJEÇÃO AUTOMÁTICA DA BIBLIOTECA CHART.JS (Evita erros de carregamento e downloads)
+    function carregarBibliotecaGraficos(callback) {
+        if (window.Chart) {
+            callback();
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = "https://jsdelivr.net";
+        script.onload = callback;
+        script.onerror = function() {
+            // Se o primeiro link falhar (bloqueio local), tenta este servidor alternativo
+            const scriptAlt = document.createElement('script');
+            scriptAlt.src = "https://unpkg.com";
+            scriptAlt.onload = callback;
+            document.head.appendChild(scriptAlt);
+        };
+        document.head.appendChild(script);
+    }
 
     async function carregarDados() {
         try {
@@ -93,11 +109,10 @@
             const textoCSV = await resposta.text();
 
             if (textoCSV.includes("<!DOCTYPE html>") || textoCSV.trim() === "") {
-                document.getElementById('status').innerText = "Erro: O link não devolveu um CSV válido.";
+                document.getElementById('status').innerText = "Erro: O link do Sheets não devolveu dados válidos.";
                 return;
             }
 
-            // Deteta o separador automático
             const primeiraLinha = textoCSV.split(/\r?\n/)[0];
             const separador = primeiraLinha.includes(";") ? ";" : ",";
 
@@ -110,7 +125,7 @@
             head.innerHTML = "";
             body.innerHTML = "";
 
-            // 1. CONSTRUIR O CABEÇALHO
+            // 1. CABEÇALHO
             let htmlHead = "<tr>";
             if (linhas[0]) {
                 linhas[0].forEach(coluna => {
@@ -120,7 +135,7 @@
             htmlHead += "</tr>";
             head.innerHTML = htmlHead;
 
-            // 2. CONSTRUIR AS LINHAS
+            // 2. LINHAS
             for (let i = linhas.length - 1; i >= 1; i--) {
                 if (!linhas[i] || linhas[i].length <= 1 || linhas[i] === "") continue;
 
@@ -134,81 +149,79 @@
                 body.innerHTML += htmlLinha;
             }
 
-            // 3. PROCESSAR DADOS PARA OS GRÁFICOS
-                const contagemTipos = {};
-                const somaLitros = {};
+            // 3. PROCESSAR OS DADOS
+            const contagemTipos = {};
+            const somaLitros = {};
 
-                for (let i = 1; i < linhas.length; i++) {
-                    if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
+            for (let i = 1; i < linhas.length; i++) {
+                if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
 
-                    let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO] ? linhas[i][COLUNA_TIPO_MOVIMENTO].replace(/"/g, '').trim() : "";
-                    let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA] ? linhas[i][COLUNA_QT_TRASFEGADA].replace(/"/g, '').trim() : "";
+                let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO] ? linhas[i][COLUNA_TIPO_MOVIMENTO].replace(/"/g, '').trim() : "";
+                let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA] ? linhas[i][COLUNA_QT_TRASFEGADA].replace(/"/g, '').trim() : "";
 
-                    // CORREÇÃO CRÍTICA: Só processa se o tipo de movimento NÃO for vazio e NÃO for "Selecione..."
-                    if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
-                        // Regista o tipo de movimento
-                        contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
-
-                        // Se a quantidade estiver vazia ou não for número, assume 0 para não quebrar o gráfico
-                        let valorNumerico = parseFloat(qtTexto.replace(',', '.')) || 0;
-                        somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
-                    }
+                if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
+                    contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
+                    let valorNumerico = parseFloat(qtTexto.replace(',', '.')) || 0;
+                    somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
                 }
+            }
 
             const labelsGraficos = Object.keys(contagemTipos);
             const dadosContagem = Object.values(contagemTipos);
             const dadosLitros = Object.values(somaLitros);
 
-            // 4. RENDERIZAR GRÁFICOS (Com verificação estrita de segurança)
-            if (typeof window.Chart !== 'undefined' && window.Chart) {
-                const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
-                if (graficoMovimentos) graficoMovimentos.destroy();
-                graficoMovimentos = new window.Chart(ctxMov, {
-                    type: 'bar',
-                    data: {
-                        labels: labelsGraficos,
-                        datasets: [{
-                            label: 'Nº Total de Movimentos por Tipo',
-                            data: dadosContagem,
-                            backgroundColor: 'rgba(0, 123, 255, 0.6)',
-                            borderColor: 'rgba(0, 123, 255, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
-                });
+            // 4. RENDERIZAR OS GRÁFICOS (Apenas após injetar a biblioteca com sucesso)
+            carregarBibliotecaGraficos(function() {
+                if (window.Chart) {
+                    const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
+                    if (graficoMovimentos) graficoMovimentos.destroy();
+                    graficoMovimentos = new window.Chart(ctxMov, {
+                        type: 'bar',
+                        data: {
+                            labels: labelsGraficos,
+                            datasets: [{
+                                label: 'Nº Total de Movimentos por Tipo',
+                                data: dadosContagem,
+                                backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                                borderColor: 'rgba(0, 123, 255, 1)',
+                                borderWidth: 1
+                            }]
+                },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
 
-                const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
-                if (graficoQuantidades) graficoQuantidades.destroy();
-                graficoQuantidades = new window.Chart(ctxQtd, {
-                    type: 'bar',
-                    data: {
-                        labels: labelsGraficos,
-                        datasets: [{
-                            label: 'Quantidade Total Trasfegada (L)',
-                            data: dadosLitros,
-                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
-                            borderColor: 'rgba(40, 167, 69, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
-                });
-            } else {
-                console.warn("Aviso: Gráficos ocultados temporariamente porque o servidor local bloqueou o script externo.");
-            }
+                    const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
+                    if (graficoQuantidades) graficoQuantidades.destroy();
+                    graficoQuantidades = new window.Chart(ctxQtd, {
+                        type: 'bar',
+                        data: {
+                            labels: labelsGraficos,
+                            datasets: [{
+                                label: 'Quantidade Total Trasfegada (L)',
+                                data: dadosLitros,
+                                backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                                borderColor: 'rgba(40, 167, 69, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+            });
 
             document.getElementById('status').style.display = 'none';
             document.getElementById('dados-tabela').style.display = 'table';
 
         } catch (erro) {
             console.error(erro);
-            document.getElementById('status').innerText = "Erro ao processar os dados recebidos.";
+            document.getElementById('status').innerText = "Erro ao processar dados.";
         }
     }
 
+    // Executa o arranque
     carregarDados();
 
+    // Atualização automática a cada 30 minutos
     setInterval(function() {
         carregarDados();
     }, 1800000);
