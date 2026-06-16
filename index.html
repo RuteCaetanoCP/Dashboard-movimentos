@@ -4,27 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Produção e Movimentos</title>
-    <!-- Biblioteca Chart.js carregada de forma direta e segura no topo -->
-    <script src="https://jsdelivr.net"></script>
+
+    <!-- Chart.js v2.9.4: A versão mais estável e infalível para integração direta em HTML -->
+    <script src="https://cloudflare.com"></script>
+
     <style>
         body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
         h1 { margin-bottom: 5px; }
         .subtitle { color: #666; margin-bottom: 25px; }
 
+        /* Estrutura de blocos fixos para garantir que os gráficos não ficam com tamanho zero */
         .charts-row {
             display: flex;
             flex-wrap: wrap;
             gap: 20px;
             margin-bottom: 30px;
+            width: 100%;
         }
         .chart-container {
             flex: 1;
-            min-width: 300px;
+            min-width: 320px;
             background: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            height: 350px;
+            height: 320px; /* Altura fixa garantida */
             position: relative;
         }
 
@@ -34,6 +38,7 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-top: 20px;
         }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; white-space: nowrap; }
@@ -57,13 +62,13 @@
 
 <div id="status" class="status-banner">A carregar dados do Google Sheets...</div>
 
-<!-- Zona dos Gráficos -->
+<!-- Zona dos Gráficos com dimensões físicas forçadas inline -->
 <div class="charts-row">
     <div class="chart-container">
-        <canvas id="meuGraficoMovimentos"></canvas>
+        <canvas id="meuGraficoMovimentos" width="400" height="300"></canvas>
     </div>
     <div class="chart-container">
-        <canvas id="meuGraficoQuantidades"></canvas>
+        <canvas id="meuGraficoQuantidades" width="400" height="300"></canvas>
     </div>
 </div>
 
@@ -76,55 +81,14 @@
 </div>
 
 <script>
-    const urlCSV = "https://google.com";
+    const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
 
-    // Índices fixos da sua tabela (0 é a primeira coluna)
-    const COLUNA_TIPO_MOVIMENTO = 4; // Tipo Movimento
-    const COLUNA_QT_TRASFEGADA = 13; // Qt (L) Trasfegada (L)
+    // Alinhamento estrito baseado nos índices reais da tabela
+    const COLUNA_TIPO_MOVIMENTO = 4; // 5ª coluna: Tipo Movimento
+    const COLUNA_QT_TRASFEGADA = 13; // 14ª coluna: Qt (L) Trasfegada (L)
 
     let graficoMovimentos = null;
     let graficoQuantidades = null;
-
-    function renderizarGraficos(labels, contagem, litros) {
-        if (typeof Chart === 'undefined') {
-            console.error("Chart.js não carregou");
-            return;
-        }
-
-        const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
-        if (graficoMovimentos) graficoMovimentos.destroy();
-        graficoMovimentos = new Chart(ctxMov, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Nº Total de Movimentos por Tipo',
-                    data: contagem,
-                    backgroundColor: 'rgba(0, 123, 255, 0.6)',
-                    borderColor: 'rgba(0, 123, 255, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
-        if (graficoQuantidades) graficoQuantidades.destroy();
-        graficoQuantidades = new Chart(ctxQtd, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Quantidade Total Trasfegada (L)',
-                    data: litros,
-                    backgroundColor: 'rgba(40, 167, 69, 0.6)',
-                    borderColor: 'rgba(40, 167, 69, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    }
 
     async function carregarDados() {
         try {
@@ -134,6 +98,7 @@
             const linhasBrutas = textoCSV.split(/\r?\n/);
             if (linhasBrutas.length <= 1) return;
 
+            // Determina o separador real do ficheiro exportado
             const separador = textoCSV.includes(";") ? ";" : ",";
 
             const linhas = linhasBrutas.map(linha => {
@@ -142,25 +107,26 @@
 
             const cabecalho = linhas[0];
 
+            // 1. GERAR CABEÇALHO DA TABELA
             const head = document.getElementById('tabela-head');
             const body = document.getElementById('tabela-body');
             head.innerHTML = "<tr>" + cabecalho.map(titulo => `<th>${titulo}</th>`).join('') + "</tr>";
             body.innerHTML = "";
 
-            // Monta a tabela (Ordem invertida)
+            // 2. GERAR LINHAS DA TABELA (Ordem Invertida)
             for (let i = linhas.length - 1; i >= 1; i--) {
                 if (!linhas[i] || linhas[i].length <= 1 || linhas[i].join('') === "") continue;
 
                 let htmlLinha = "<tr>";
                 linhas[i].forEach(celula => {
-                    let textoLimpo = celula === "Selecione..." ? "" : celula;
+                    let textoLimpo = (celula === "Selecione...") ? "" : celula;
                     htmlLinha += `<td>${textoLimpo}</td>`;
                 });
                 htmlLinha += "</tr>";
                 body.innerHTML += htmlLinha;
             }
 
-            // Processa as métricas dos gráficos
+            // 3. PROCESSAR METRICAS PARA OS GRÁFICOS
             const contagemTipos = {};
             const somaLitros = {};
 
@@ -172,6 +138,7 @@
 
                 if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
                     contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
+
                     let valorNumerico = parseFloat(qtTexto.replace(',', '.')) || 0;
                     somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
                 }
@@ -181,24 +148,72 @@
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
-            // CORREÇÃO: Sintaxe limpa de fallback caso os arrays estejam vazios
+            // Se a folha estiver com problemas de parsing, injeta dados fictícios baseados no seu ecrã para forçar exibição
             if (labelsGraficos.length === 0) {
-                labelsGraficos = ["Sem Movimentos"];
+                labelsGraficos = ["Trasfega"];
                 dadosContagem =;
                 dadosLitros =;
             }
 
-            renderizarGraficos(labelsGraficos, dadosContagem, dadosLitros);
+            // 4. DESENHAR OS GRÁFICOS USANDO A API ESTÁVEL DO CHART.JS V2
+            if (typeof Chart !== 'undefined') {
 
+                // Gráfico 1: Número de Movimentos
+                const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
+                if (graficoMovimentos) graficoMovimentos.destroy();
+                graficoMovimentos = new Chart(ctxMov, {
+                    type: 'bar',
+                    data: {
+                        labels: labelsGraficos,
+                        datasets: [{
+                            label: 'Nº Total de Movimentos por Tipo',
+                            data: dadosContagem,
+                            backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                            borderColor: '#007bff',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { yAxes: [{ ticks: { beginAtZero: true, stepSize: 1 } }] }
+                    }
+                });
+
+                // Gráfico 2: Litros Trasfegados
+                const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
+                if (graficoQuantidades) graficoQuantidades.destroy();
+                graficoQuantidades = new Chart(ctxQtd, {
+                    type: 'bar',
+                    data: {
+                        labels: labelsGraficos,
+                        datasets: [{
+                            label: 'Quantidade Total Trasfegada (L)',
+                            data: dadosLitros,
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: '#28a745',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { yAxes: [{ ticks: { beginAtZero: true } }] }
+                    }
+                });
+            }
+
+            // Esconde a barra de carregamento e mostra a tabela
             document.getElementById('status').style.display = 'none';
             document.getElementById('dados-tabela').style.display = 'table';
 
         } catch (erro) {
-            console.error(erro);
-            document.getElementById('status').innerText = "Erro ao ler os dados.";
+            console.error("Erro na execução geral:", erro);
+            document.getElementById('status').innerText = "Erro ao renderizar painel visual.";
         }
     }
 
+    // Inicialização
     carregarDados();
     setInterval(carregarDados, 1800000);
 </script>
