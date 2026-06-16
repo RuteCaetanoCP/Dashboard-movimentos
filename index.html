@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Dados Android</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
+        h1 { color: #333; }
+        .table-container { overflow-x: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #007bff; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+        .loading { font-style: italic; color: #666; }
+    </style>
+</head>
+<body>
+
+<h1>Dados Recebidos do Android</h1>
+<p>Os dados abaixo são atualizados automaticamente a partir do Google Sheets.</p>
+
+<div class="table-container">
+    <p id="status" class="loading">A carregar dados...</p>
+    <table id="dados-tabela" style="display: none;">
+        <thead id="tabela-head"></thead>
+        <tbody id="tabela-body"></tbody>
+    </table>
+</div>
+
+<script>
+    // TRATAMENTO DOS DADOS DO GOOGLE SHEETS
+    // Substitua aspas e cole o seu link do Passo 1 aqui:
+    const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
+
+    async function carregarDados() {
+        try {
+            const resposta = await fetch(urlCSV);
+            const textoCSV = await resposta.text();
+
+            // Converte as linhas do CSV em Arrays
+            const linhas = textoCSV.split("\n").map(linha => {
+                // Divide por vírgulas, mas ignora vírgulas dentro de aspas (caso existam textos longos)
+                return linha.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            });
+
+            if (linhas.length === 0 || linhas[0].length === 1 && linhas[0][0] === "") {
+                document.getElementById('status').innerText = "Nenhum dado encontrado.";
+                return;
+            }
+
+            const head = document.getElementById('tabela-head');
+            const body = document.getElementById('tabela-body');
+
+            // Limpa tabelas anteriores se houver reinício
+            head.innerHTML = "";
+            body.innerHTML = "";
+
+            // 1. Criar o Cabeçalho (Primeira linha do Sheets)
+            const colunas = linhas[0];
+            let htmlHead = "<tr>";
+            colunas.forEach(coluna => {
+                htmlHead += `<th>${coluna.replace(/"/g, '')}</th>`;
+            });
+            htmlHead += "</tr>";
+            head.innerHTML = htmlHead;
+
+            // 2. Criar as Linhas de Dados (Invertido: do mais recente para o mais antigo)
+for (let i = linhas.length - 1; i >= 1; i--) {
+    if (linhas[i].length === 1 && linhas[i][0] === "") continue; // ignora linhas vazias
+
+    let htmlLinha = "<tr>";
+    linhas[i].forEach(celula => {
+        // Se a célula estiver vazia ou disser "Selecione...", deixa em branco na tabela
+        let textoLimpo = celula.replace(/"/g, '').trim();
+        if (textoLimpo === "Selecione...") textoLimpo = "";
+
+        htmlLinha += `<td>${textoLimpo}</td>`;
+    });
+    htmlLinha += "</tr>";
+    body.innerHTML += htmlLinha;
+}
+
+            // Esconder o "A carregar" e mostrar a tabela
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('dados-tabela').style.display = 'table';
+
+        } catch (erro) {
+            console.error(erro);
+            document.getElementById('status').innerText = "Erro ao carregar os dados do Google Sheets.";
+        }
+    }
+
+    // Executa a função ao abrir a página
+    carregarDados();
+</script>
+</body>
+</html>
