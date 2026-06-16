@@ -95,33 +95,60 @@
             }
             body.innerHTML = htmlBody;
 
-            // Encontra os índices das colunas de forma dinâmica pelo nome
-            let colMovimento = 4;
-            let colQuantidade = 13;
+           // 1. DESCOBERTA RIGOROSA E EXATA DAS COLUNAS
+            let colMovimento = 4; // Valor padrão de segurança
+            let colQuantidade = 13; // Valor padrão de segurança
 
             for(let j = 0; j < cabecalho.length; j++) {
-                let nomeCol = cabecalho[j].toLowerCase();
-                if(nomeCol.includes("tipo movimento")) colMovimento = j;
-                if(nomeCol.includes("qt") || nomeCol.includes("trasfegada")) colQuantidade = j;
+                let nomeCol = cabecalho[j].toString().toLowerCase().trim();
+
+                // Procura exata pelo nome da coluna de movimento
+                if(nomeCol.includes("tipo movimento")) {
+                    colMovimento = j;
+                }
+                // Procura exata pelo cabeçalho final de quantidade
+                if(nomeCol.includes("qt (l)") || nomeCol.includes("trasfegada (l)")) {
+                    colQuantidade = j;
+                }
             }
 
             const contagemTipos = {};
             const somaLitros = {};
 
+            // 2. PROCESSAMENTO SEGURO LINHA A LINHA
             for (let i = 1; i < linhas.length; i++) {
+                // Se a linha não tiver dados suficientes para alcançar as colunas necessárias, ignora
+                if (!linhas[i] || linhas[i].length <= Math.max(colMovimento, colQuantidade)) continue;
+
                 let tipo = linhas[i][colMovimento];
                 let qtdTexto = linhas[i][colQuantidade];
 
-                if (tipo && tipo !== "Selecione..." && tipo !== "") {
+                // Valida se a célula de movimento tem conteúdo real
+                if (tipo && tipo.trim() !== "" && tipo !== "Selecione...") {
+                    tipo = tipo.trim();
+
+                    // Gráfico 1: Contagem de Movimentos (Azul)
                     contagemTipos[tipo] = (contagemTipos[tipo] || 0) + 1;
 
-                    let qtdLimpa = (qtdTexto || "").toString().replace(/\s+/g,'').replace(',', '.');
-                    let valor = parseFloat(qtdLimpa) || 0;
-                    somaLitros[tipo] = (somaLitros[tipo] || 0) + valor;
+                    // Gráfico 2: Soma de Litros (Verde)
+                    if (qtdTexto && qtdTexto.trim() !== "") {
+                        // Limpeza total de espaços, pontos e formatações de milhar do Sheets
+                        let qtdLimpa = qtdTexto.toString()
+                            .replace(/\s+/g,'')
+                            .replace(/\./g,'')
+                            .replace(',', '.');
+
+                        let valor = parseFloat(qtdLimpa);
+
+                        // Garante que só soma se for um número válido e real
+                        if (!isNaN(valor) && valor > 0) {
+                            somaLitros[tipo] = (somaLitros[tipo] || 0) + valor;
+                        }
+                    }
                 }
             }
 
-        let labelsGraficos = Object.keys(contagemTipos);
+            let labelsGraficos = Object.keys(contagemTipos);
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
