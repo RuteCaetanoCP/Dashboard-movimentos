@@ -3,25 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Dados Android</title>
+    <title>Dashboard de Produção e Movimentos</title>
+
+    <!-- Link alternativo via UNPKG (Mais compatível com o servidor local do Android Studio) -->
+    <script src="https://unpkg.com"></script>
+
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
-        h1 { color: #333; }
-        .table-container { overflow-x: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
+        h1 { margin-bottom: 5px; }
+        .subtitle { color: #666; margin-bottom: 25px; }
+
+        .charts-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            height: 350px;
+            position: relative;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #007bff; color: white; }
-        tr:hover { background-color: #f1f1f1; }
-        .loading { font-style: italic; color: #666; }
+        th { background-color: #007bff; color: white; position: sticky; top: 0; }
+        tr:hover { background-color: #f8f9fa; }
+
+        .status-banner {
+            background-color: #e2e3e5;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
 
-<h1>Dados Recebidos do Android</h1>
-<p>Os dados abaixo são atualizados automaticamente a partir do Google Sheets.</p>
+<h1>Painel de Controlo de Movimentos</h1>
+<p class="subtitle">Dados integrados em tempo real a partir da aplicação Android.</p>
 
+<div id="status" class="status-banner">A carregar dados do Google Sheets...</div>
+
+<!-- Zona dos Gráficos -->
+<div class="charts-row">
+    <div class="chart-container">
+        <canvas id="meuGraficoMovimentos"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="meuGraficoQuantidades"></canvas>
+    </div>
+</div>
+
+<!-- Zona da Tabela -->
 <div class="table-container">
-    <p id="status" class="loading">A carregar dados...</p>
     <table id="dados-tabela" style="display: none;">
         <thead id="tabela-head"></thead>
         <tbody id="tabela-body"></tbody>
@@ -29,82 +78,136 @@
 </div>
 
 <script>
-    // TRATAMENTO DOS DADOS DO GOOGLE SHEETS
-    // Substitua aspas e cole o seu link do Passo 1 aqui:
+    // CONFIGURAÇÃO MANUAL
     const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
+
+    const COLUNA_TIPO_MOVIMENTO = 2;
+    const COLUNA_QT_TRASFEGADA = 4;
+
+    let graficoMovimentos = null;
+    let graficoQuantidades = null;
 
     async function carregarDados() {
         try {
-            const resposta = await fetch(urlCSV);
+            const resposta = await fetch(`${urlCSV}&cacheBuster=${new Date().getTime()}`);
             const textoCSV = await resposta.text();
 
-            // Converte as linhas do CSV em Arrays
-            const linhas = textoCSV.split("\n").map(linha => {
-                // Divide por vírgulas, mas ignora vírgulas dentro de aspas (caso existam textos longos)
-                return linha.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-            });
-
-            if (linhas.length === 0 || linhas[0].length === 1 && linhas[0][0] === "") {
-                document.getElementById('status').innerText = "Nenhum dado encontrado.";
+            if (textoCSV.includes("<!DOCTYPE html>") || textoCSV.trim() === "") {
+                document.getElementById('status').innerText = "Erro: O link não devolveu um CSV válido.";
                 return;
             }
 
+            // Deteta o separador automático
+            const primeiraLinha = textoCSV.split(/\r?\n/)[0];
+            const separador = primeiraLinha.includes(";") ? ";" : ",";
+
+            const linhas = textoCSV.split(/\r?\n/).map(linha => {
+                return separador === ";" ? linha.split(/;(?=(?:(?:[^"]*"){2})*[^"]*$)/) : linha.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            });
+
             const head = document.getElementById('tabela-head');
             const body = document.getElementById('tabela-body');
-
-            // Limpa tabelas anteriores se houver reinício
             head.innerHTML = "";
             body.innerHTML = "";
 
-            // 1. Criar o Cabeçalho (Primeira linha do Sheets)
-            const colunas = linhas[0];
+            // 1. CONSTRUIR O CABEÇALHO
             let htmlHead = "<tr>";
-            colunas.forEach(coluna => {
-                htmlHead += `<th>${coluna.replace(/"/g, '')}</th>`;
-            });
+            if (linhas[0]) {
+                linhas[0].forEach(coluna => {
+                    htmlHead += `<th>${coluna.replace(/"/g, '').trim()}</th>`;
+                });
+            }
             htmlHead += "</tr>";
             head.innerHTML = htmlHead;
 
-            // 2. Criar as Linhas de Dados (Invertido: do mais recente para o mais antigo)
-for (let i = linhas.length - 1; i >= 1; i--) {
-    if (linhas[i].length === 1 && linhas[i][0] === "") continue; // ignora linhas vazias
+            // 2. CONSTRUIR AS LINHAS
+            for (let i = linhas.length - 1; i >= 1; i--) {
+                if (!linhas[i] || linhas[i].length <= 1 || linhas[i] === "") continue;
 
-    let htmlLinha = "<tr>";
-    linhas[i].forEach(celula => {
-        // Se a célula estiver vazia ou disser "Selecione...", deixa em branco na tabela
-        let textoLimpo = celula.replace(/"/g, '').trim();
-        if (textoLimpo === "Selecione...") textoLimpo = "";
+                let htmlLinha = "<tr>";
+                linhas[i].forEach(celula => {
+                    let textoLimpo = celula ? celula.replace(/"/g, '').trim() : "";
+                    if (textoLimpo === "Selecione...") textoLimpo = "";
+                    htmlLinha += `<td>${textoLimpo}</td>`;
+                });
+                htmlLinha += "</tr>";
+                body.innerHTML += htmlLinha;
+            }
 
-        htmlLinha += `<td>${textoLimpo}</td>`;
-    });
-    htmlLinha += "</tr>";
-    body.innerHTML += htmlLinha;
-}
+            // 3. PROCESSAR DADOS PARA OS GRÁFICOS
+            const contagemTipos = {};
+            const somaLitros = {};
 
-            // Esconder o "A carregar" e mostrar a tabela
+            for (let i = 1; i < linhas.length; i++) {
+                if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
+
+                let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO] ? linhas[i][COLUNA_TIPO_MOVIMENTO].replace(/"/g, '').trim() : "";
+                let qtTexto = xls = linhas[i][COLUNA_QT_TRASFEGADA] ? linhas[i][COLUNA_QT_TRASFEGADA].replace(/"/g, '').trim() : "";
+
+                if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
+                    contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
+                    let valorNumerico = parseFloat(qtTexto.replace(',', '.')) || 0;
+                    somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
+                }
+            }
+
+            const labelsGraficos = Object.keys(contagemTipos);
+            const dadosContagem = Object.values(contagemTipos);
+            const dadosLitros = Object.values(somaLitros);
+
+            // 4. RENDERIZAR GRÁFICOS (Com verificação estrita de segurança)
+            if (typeof window.Chart !== 'undefined' && window.Chart) {
+                const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
+                if (graficoMovimentos) graficoMovimentos.destroy();
+                graficoMovimentos = new window.Chart(ctxMov, {
+                    type: 'bar',
+                    data: {
+                        labels: labelsGraficos,
+                        datasets: [{
+                            label: 'Nº Total de Movimentos por Tipo',
+                            data: dadosContagem,
+                            backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                            borderColor: 'rgba(0, 123, 255, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+
+                const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
+                if (graficoQuantidades) graficoQuantidades.destroy();
+                graficoQuantidades = new window.Chart(ctxQtd, {
+                    type: 'bar',
+                    data: {
+                        labels: labelsGraficos,
+                        datasets: [{
+                            label: 'Quantidade Total Trasfegada (L)',
+                            data: dadosLitros,
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            } else {
+                console.warn("Aviso: Gráficos ocultados temporariamente porque o servidor local bloqueou o script externo.");
+            }
+
             document.getElementById('status').style.display = 'none';
             document.getElementById('dados-tabela').style.display = 'table';
 
         } catch (erro) {
             console.error(erro);
-            document.getElementById('status').innerText = "Erro ao carregar os dados do Google Sheets.";
+            document.getElementById('status').innerText = "Erro ao processar os dados recebidos.";
         }
     }
 
-    // 1. Executa a função imediatamente ao abrir a página pela primeira vez
-carregarDados();
-
-// 2. Configura o temporizador para atualizar sozinho (30 minutos = 1800000 milissegundos)
-setInterval(function() {
-    console.log("A atualizar dados automaticamente...");
-
-    const status = document.getElementById('status');
-    status.innerText = "A atualizar dados...";
-    status.style.display = 'block';
-
     carregarDados();
-}, 1800000);
 
+    setInterval(function() {
+        carregarDados();
+    }, 1800000);
 </script>
 </body>
 </html>
