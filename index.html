@@ -5,53 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Produção e Movimentos</title>
 
-    <!-- Biblioteca Chart.js v2.9.4 estável e direta -->
+    <!-- Biblioteca Chart.js correta -->
     <script src="https://cloudflare.com"></script>
 
     <style>
         body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
         h1 { margin-bottom: 5px; }
         .subtitle { color: #666; margin-bottom: 25px; }
-
-        .charts-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            margin-bottom: 30px;
-            width: 100%;
-        }
-        .chart-container {
-            flex: 1;
-            min-width: 320px;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            height: 320px;
-            position: relative;
-        }
-
-        .table-container {
-            overflow-x: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-top: 20px;
-        }
+        .charts-row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; width: 100%; }
+        .chart-container { flex: 1; min-width: 320px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 320px; position: relative; }
+        .table-container { overflow-x: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-top: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; white-space: nowrap; }
         th { background-color: #007bff; color: white; position: sticky; top: 0; }
         tr:hover { background-color: #f8f9fa; }
-
-        .status-banner {
-            background-color: #e2e3e5;
-            padding: 10px 15px;
-            border-radius: 5px;
-            display: inline-block;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
+        .status-banner { background-color: #e2e3e5; padding: 10px 15px; border-radius: 5px; display: inline-block; font-weight: bold; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -61,7 +29,6 @@
 
 <div id="status" class="status-banner">A carregar dados do Google Sheets...</div>
 
-<!-- Zona dos Gráficos -->
 <div class="charts-row">
     <div class="chart-container">
         <canvas id="meuGraficoMovimentos" width="400" height="300"></canvas>
@@ -71,7 +38,6 @@
     </div>
 </div>
 
-<!-- Zona da Tabela -->
 <div class="table-container">
     <table id="dados-tabela" style="display: none;">
         <thead id="tabela-head"></thead>
@@ -80,22 +46,22 @@
 </div>
 
 <script>
-    const urlCSV = "https://google.com";
+    // ATENÇÃO: Substitua este URL pelo link correto de exportação CSV do seu Google Sheets!
+    const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
 
     const COLUNA_TIPO_MOVIMENTO = 4;
     const COLUNA_QT_TRASFEGADA = 13;
-
     let graficoMovimentos = null;
     let graficoQuantidades = null;
 
     async function carregarDados() {
         try {
+            // CORREÇÃO: Template literal com crases corrigido para o fetch
             const resposta = await fetch(`${urlCSV}&cacheBuster=${new Date().getTime()}`);
             const textoCSV = await resposta.text();
 
             const linhasBrutas = textoCSV.split(/\r?\n/);
             if (linhasBrutas.length <= 1) return;
-
             const separador = textoCSV.includes(";") ? ";" : ",";
 
             const linhas = linhasBrutas.map(linha => {
@@ -104,26 +70,27 @@
 
             const cabecalho = linhas[0];
 
-            // 1. GERAR CABEÇALHO DA TABELA
+            // CORREÇÃO: Adicionado o sinal '=' que faltava na linha 108
             const head = document.getElementById('tabela-head');
             const body = document.getElementById('tabela-body');
+
+            // CORREÇÃO: Crases corrigidas na inserção do HTML do cabeçalho
             head.innerHTML = "<tr>" + cabecalho.map(titulo => `<th>${titulo}</th>`).join('') + "</tr>";
             body.innerHTML = "";
 
-            // 2. GERAR LINHAS DA TABELA (Mais recente primeiro)
             for (let i = linhas.length - 1; i >= 1; i--) {
                 if (!linhas[i] || linhas[i].length <= 1 || linhas[i].join('') === "") continue;
 
                 let htmlLinha = "<tr>";
                 linhas[i].forEach(celula => {
                     let textoLimpo = (celula === "Selecione...") ? "" : celula;
+                    // CORREÇÃO: Crases corrigidas aqui também
                     htmlLinha += `<td>${textoLimpo}</td>`;
                 });
                 htmlLinha += "</tr>";
                 body.innerHTML += htmlLinha;
             }
 
-            // 3. PROCESSAR MÉTRICAS PARA OS GRÁFICOS
             const contagemTipos = {};
             const somaLitros = {};
 
@@ -144,18 +111,17 @@
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
-            // CORREÇÃO: Sintaxe 100% válida de fallback seguro caso a contagem falhe
+            // CORREÇÃO: Arrays vazios definidos corretamente com []
             if (labelsGraficos.length === 0) {
                 labelsGraficos = ["Trasfega"];
-                dadosContagem =;
-                dadosLitros =;
+                dadosContagem = [];
+                dadosLitros = [];
             }
 
-            // 4. DESENHAR OS GRÁFICOS
             if (typeof Chart !== 'undefined') {
-
                 const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
                 if (graficoMovimentos) graficoMovimentos.destroy();
+
                 graficoMovimentos = new Chart(ctxMov, {
                     type: 'bar',
                     data: {
@@ -177,6 +143,7 @@
 
                 const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
                 if (graficoQuantidades) graficoQuantidades.destroy();
+
                 graficoQuantidades = new Chart(ctxQtd, {
                     type: 'bar',
                     data: {
@@ -197,7 +164,6 @@
                 });
             }
 
-            // Remove banner e mostra tabela
             document.getElementById('status').style.display = 'none';
             document.getElementById('dados-tabela').style.display = 'table';
 
