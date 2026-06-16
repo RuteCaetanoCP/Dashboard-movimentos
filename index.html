@@ -135,21 +135,25 @@
             }
 
             // 3. PROCESSAR DADOS PARA OS GRÁFICOS
-            const contagemTipos = {};
-            const somaLitros = {};
+                const contagemTipos = {};
+                const somaLitros = {};
 
-            for (let i = 1; i < linhas.length; i++) {
-                if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
+                for (let i = 1; i < linhas.length; i++) {
+                    if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
 
-                let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO] ? linhas[i][COLUNA_TIPO_MOVIMENTO].replace(/"/g, '').trim() : "";
-                let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA] ? linhas[i][COLUNA_QT_TRASFEGADA].replace(/"/g, '').trim() : "";
+                    let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO] ? linhas[i][COLUNA_TIPO_MOVIMENTO].replace(/"/g, '').trim() : "";
+                    let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA] ? linhas[i][COLUNA_QT_TRASFEGADA].replace(/"/g, '').trim() : "";
 
-                if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
-                    contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
-                    let valorNumerico = parseFloat(qtTexto.replace(',', '.')) || 0;
-                    somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
+                    // CORREÇÃO CRÍTICA: Só processa se o tipo de movimento NÃO for vazio e NÃO for "Selecione..."
+                    if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
+                        // Regista o tipo de movimento
+                        contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
+
+                        // Se a quantidade estiver vazia ou não for número, assume 0 para não quebrar o gráfico
+                        let valorNumerico = parseFloat(qtTexto.replace(',', '.')) || 0;
+                        somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
+                    }
                 }
-            }
 
             const labelsGraficos = Object.keys(contagemTipos);
             const dadosContagem = Object.values(contagemTipos);
