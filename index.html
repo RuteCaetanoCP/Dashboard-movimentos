@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Produção e Movimentos</title>
+    <!-- Biblioteca Chart.js carregada de forma direta e segura no topo -->
+    <script src="https://jsdelivr.net"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
         h1 { margin-bottom: 5px; }
@@ -73,27 +75,19 @@
     </table>
 </div>
 
-<!-- INJEÇÃO DIRETA DA BIBLIOTECA MINIATURIZADA (Sem dependência de links externos) -->
 <script>
-    // Carregador dinâmico fallback via iframe/objeto para contornar CSP restrito do GitHub
-    (function() {
-        var script = document.createElement('script');
-        script.src = "https://cloudflare.com";
-        document.head.appendChild(script);
-    })();
-</script>
+    const urlCSV = "https://google.com";
 
-<script>
-    const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
+    // Índices fixos da sua tabela (0 é a primeira coluna)
+    const COLUNA_TIPO_MOVIMENTO = 4; // Tipo Movimento
+    const COLUNA_QT_TRASFEGADA = 13; // Qt (L) Trasfegada (L)
 
     let graficoMovimentos = null;
     let graficoQuantidades = null;
 
-    // Função auxiliar para tentar desenhar mesmo se a biblioteca demorar a carregar
-    function desenharGraficosComVerificacao(labels, contagem, litros) {
-        // Se o Chart.js ainda não carregou na Janela Global, tenta usar o fallback do SVG nativo para não deixar em branco
+    function renderizarGraficos(labels, contagem, litros) {
         if (typeof Chart === 'undefined') {
-            setTimeout(function() { carregarDados(); }, 1000); // Tenta novamente em 1 segundo
+            console.error("Chart.js não carregou");
             return;
         }
 
@@ -106,8 +100,9 @@
                 datasets: [{
                     label: 'Nº Total de Movimentos por Tipo',
                     data: contagem,
-                    backgroundColor: '#007bff',
-                    borderWidth: 0
+                    backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    borderWidth: 1
                 }]
             },
             options: { responsive: true, maintainAspectRatio: false }
@@ -122,8 +117,9 @@
                 datasets: [{
                     label: 'Quantidade Total Trasfegada (L)',
                     data: litros,
-                    backgroundColor: '#28a745',
-                    borderWidth: 0
+                    backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
                 }]
             },
             options: { responsive: true, maintainAspectRatio: false }
@@ -146,15 +142,12 @@
 
             const cabecalho = linhas[0];
 
-            // Mapeamento manual direto e fixo para garantir precisão absoluta
-            const indiceTipoMov = 4;
-            const indiceQt = 13;
-
             const head = document.getElementById('tabela-head');
             const body = document.getElementById('tabela-body');
             head.innerHTML = "<tr>" + cabecalho.map(titulo => `<th>${titulo}</th>`).join('') + "</tr>";
             body.innerHTML = "";
 
+            // Monta a tabela (Ordem invertida)
             for (let i = linhas.length - 1; i >= 1; i--) {
                 if (!linhas[i] || linhas[i].length <= 1 || linhas[i].join('') === "") continue;
 
@@ -167,14 +160,15 @@
                 body.innerHTML += htmlLinha;
             }
 
+            // Processa as métricas dos gráficos
             const contagemTipos = {};
             const somaLitros = {};
 
             for (let i = 1; i < linhas.length; i++) {
-                if (!linhas[i] || linhas[i].length <= Math.max(indiceTipoMov, indiceQt)) continue;
+                if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
 
-                let tipoMov = linhas[i][indiceTipoMov];
-                let qtTexto = linhas[i][indiceQt];
+                let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO];
+                let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA];
 
                 if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
                     contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
@@ -187,20 +181,21 @@
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
-            // Força dados visuais caso o processamento do array falte no loop
+            // CORREÇÃO: Sintaxe limpa de fallback caso os arrays estejam vazios
             if (labelsGraficos.length === 0) {
-                labelsGraficos = ["Trasfega"];
+                labelsGraficos = ["Sem Movimentos"];
                 dadosContagem =;
                 dadosLitros =;
             }
 
-            desenharGraficosComVerificacao(labelsGraficos, dadosContagem, dadosLitros);
+            renderizarGraficos(labelsGraficos, dadosContagem, dadosLitros);
 
             document.getElementById('status').style.display = 'none';
             document.getElementById('dados-tabela').style.display = 'table';
 
         } catch (erro) {
             console.error(erro);
+            document.getElementById('status').innerText = "Erro ao ler os dados.";
         }
     }
 
