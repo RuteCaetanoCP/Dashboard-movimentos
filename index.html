@@ -89,20 +89,31 @@
                 body.innerHTML += htmlLinha;
             }
 
-            const contagemTipos = {};
+               const contagemTipos = {};
             const somaLitros = {};
 
+            // i = 1 para ignorar a linha de cabeçalho
             for (let i = 1; i < linhas.length; i++) {
-                if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
+                // Garante que a linha existe e tem colunas suficientes
+                if (!linhas[i] || linhas[i].length <= 4) continue;
 
                 let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO];
                 let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA];
 
-                if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
+                // Trata a string para remover espaços ou nulos
+                tipoMov = tipoMov ? tipoMov.trim() : "";
+
+                // Valida se a linha tem um tipo de movimento preenchido
+                if (tipoMov !== "" && tipoMov !== "Selecione...") {
+                    // Contagem de movimentos
                     contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
-                    let textoLimpoQtd = (qtTexto || "").toString().replace(/\s+/g,'').replace(',', '.');
-                    let valorNumerico = parseFloat(textoLimpoQtd) || 0;
-                    somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
+
+                    // Tratamento e soma de litros
+                    if (qtTexto) {
+                        let textoLimpoQtd = qtTexto.toString().replace(/\s+/g,'').replace(',', '.');
+                        let valorNumerico = parseFloat(textoLimpoQtd) || 0;
+                        somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
+                    }
                 }
             }
 
@@ -110,12 +121,12 @@
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
+            // Se falhar tudo, injeta um valor de segurança para não quebrar o gráfico
             if (labelsGraficos.length === 0) {
-                labelsGraficos = ["Trasfega"];
-                dadosContagem = [];
-                dadosLitros = [];
+                labelsGraficos = ["Sem Dados"];
+                dadosContagem = [0];
+                dadosLitros = [0];
             }
-
             if (typeof Chart !== 'undefined') {
                 const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
                 if (graficoMovimentos) graficoMovimentos.destroy();
