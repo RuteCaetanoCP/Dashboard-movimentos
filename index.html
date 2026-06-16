@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Produção e Movimentos</title>
 
-    <!-- Biblioteca Chart.js correta -->
-    <script src="https://jsdelivr.net"></script>
+    <!-- CDN Oficial do Chart.js v4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; color: #333; }
@@ -31,10 +31,10 @@
 
 <div class="charts-row">
     <div class="chart-container">
-        <canvas id="meuGraficoMovimentos" width="400" height="300"></canvas>
+        <canvas id="meuGraficoMovimentos"></canvas>
     </div>
     <div class="chart-container">
-        <canvas id="meuGraficoQuantidades" width="400" height="300"></canvas>
+        <canvas id="meuGraficoQuantidades"></canvas>
     </div>
 </div>
 
@@ -45,83 +45,97 @@
     </table>
 </div>
 
-</body>
-</html>
-
 <script>
-    // URL de exportação CSV do seu Google Sheets
     const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
-    const COLUNA_TIPO_MOVIMENTO = 4;
-    const COLUNA_QT_TRASFEGADA = 13;
 
     let graficoMovimentos = null;
     let graficoQuantidades = null;
 
-   async function carregarDados() {
+    async function carregarDados() {
         try {
-            const resposta = await fetch(`${urlCSV}&cacheBuster=${new Date().getTime()}`);
+            const resposta = await fetch(urlCSV + "&cacheBuster=" + new Date().getTime());
             const textoCSV = await resposta.text();
             const linhasBrutas = textoCSV.split(/\r?\n/);
 
-            if (linhasBrutas.length <= 1) return;
+            if (linhasBrutas.length <= 1) {
+                document.getElementById('status').innerText = "O Google Sheets respondeu mas não tem dados.";
+                return;
+            }
 
             const separador = textoCSV.includes(";") ? ";" : ",";
-            const linhas = linhasBrutas.map(linha => {
-                return linha.split(separador).map(celula => celula.replace(/"/g, '').trim());
-            });
+            const linhas = [];
+            for(let i = 0; i < linhasBrutas.length; i++) {
+                if(linhasBrutas[i].trim() !== "") {
+                    linhas.push(linhasBrutas[i].split(separador).map(c => c.replace(/"/g, '').trim()));
+                }
+            }
 
-            const cabecalho = linhas[0]; // Seleciona apenas a primeira linha para o cabeçalho
+            const cabecalho = linhas[0];
             const head = document.getElementById('tabela-head');
             const body = document.getElementById('tabela-body');
 
-            head.innerHTML = "<tr>" + cabecalho.map(titulo => `<th>${titulo}</th>`).join('') + "</tr>";
-            body.innerHTML = "";
+            // Constroi o cabeçalho de forma simples e segura
+            let htmlHead = "<tr>";
+            for(let i = 0; i < cabecalho.length; i++) {
+                htmlHead += "<th>" + cabecalho[i] + "</th>";
+            }
+            htmlHead += "</tr>";
+            head.innerHTML = htmlHead;
 
+            // Constroi o corpo da tabela de trás para a frente (mais recentes primeiro)
+            let htmlBody = "";
             for (let i = linhas.length - 1; i >= 1; i--) {
-                if (!linhas[i] || linhas[i].length <= 1 || linhas[i].join('') === "") continue;
+                htmlBody += "<tr>";
+                for(let j = 0; j < linhas[i].length; j++) {
+                    let texto = linhas[i][j];
+                    if(texto === "Selecione...") texto = "";
+                    htmlBody += "<td>" + texto + "</td>";
+                }
+                htmlBody += "</tr>";
+            }
+            body.innerHTML = htmlBody;
 
-                let htmlLinha = "<tr>";
-                linhas[i].forEach(celula => {
-                    let textoLimpo = (celula === "Selecione...") ? "" : celula;
-                    htmlLinha += `<td>${textoLimpo}</td>`;
-                });
-                htmlLinha += "</tr>";
-                body.innerHTML += htmlLinha;
+            // Encontra os índices das colunas de forma dinâmica pelo nome
+            let colMovimento = 4;
+            let colQuantidade = 13;
+
+            for(let j = 0; j < cabecalho.length; j++) {
+                let nomeCol = cabecalho[j].toLowerCase();
+                if(nomeCol.includes("tipo movimento")) colMovimento = j;
+                if(nomeCol.includes("qt") || nomeCol.includes("trasfegada")) colQuantidade = j;
             }
 
             const contagemTipos = {};
             const somaLitros = {};
 
             for (let i = 1; i < linhas.length; i++) {
-                if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
+                let tipo = linhas[i][colMovimento];
+                let qtdTexto = linhas[i][colQuantidade];
 
-                let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO];
-                let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA];
+                if (tipo && tipo !== "Selecione..." && tipo !== "") {
+                    contagemTipos[tipo] = (contagemTipos[tipo] || 0) + 1;
 
-                if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
-                    contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
-                    let textoLimpoQtd = (qtTexto || "").toString().replace(/\s+/g,'').replace(',', '.');
-                    let valorNumerico = parseFloat(textoLimpoQtd) || 0;
-                    somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
+                    let qtdLimpa = (qtdTexto || "").toString().replace(/\s+/g,'').replace(',', '.');
+                    let valor = parseFloat(qtdLimpa) || 0;
+                    somaLitros[tipo] = (somaLitros[tipo] || 0) + valor;
                 }
             }
 
-            let labelsGraficos = Object.keys(contagemTipos);
+        let labelsGraficos = Object.keys(contagemTipos);
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
-            // CORREÇÃO: Garante que os arrays contêm dados numéricos (0) para desenhar o eixo
+            // CORREÇÃO DA LINHA 130: Arrays vazios válidos [] sem vírgulas soltas
             if (labelsGraficos.length === 0) {
-                labelsGraficos = ["Sem movimentos"];
-                dadosContagem = [0];
-                dadosLitros = [0];
+                labelsGraficos = ["Sem Movimentos"];
+                dadosContagem = [];
+                dadosLitros = [];
             }
 
             if (typeof Chart !== 'undefined') {
-                // Gráfico 1: Total de Movimentos
+                // Gráfico 1
                 const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
                 if (graficoMovimentos) graficoMovimentos.destroy();
-
                 graficoMovimentos = new Chart(ctxMov, {
                     type: 'bar',
                     data: {
@@ -137,19 +151,13 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { precision: 0 }
-                            }
-                        }
+                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
                     }
                 });
 
-                // Gráfico 2: Quantidades Litros
+                // Gráfico 2
                 const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
                 if (graficoQuantidades) graficoQuantidades.destroy();
-
                 graficoQuantidades = new Chart(ctxQtd, {
                     type: 'bar',
                     data: {
@@ -165,11 +173,7 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
+                        scales: { y: { beginAtZero: true } }
                     }
                 });
             }
@@ -178,21 +182,13 @@
             document.getElementById('dados-tabela').style.display = 'table';
 
         } catch (erro) {
-            console.error("Erro geral:", erro);
+            console.error("Erro no processamento:", erro);
             document.getElementById('status').innerText = "Erro ao renderizar painel visual.";
         }
     }
-    
-   // Executa a função ao carregar a página
-    carregarDados();
 
-    // Atualiza os dados a cada 30 minutos
+    carregarDados();
     setInterval(carregarDados, 1800000);
 </script>
-
-
-
-
-
-
-
+</body>
+</html>
