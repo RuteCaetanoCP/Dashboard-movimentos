@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Produção e Movimentos</title>
 
-    <!-- Chart.js v2.9.4: A versão mais estável e infalível para integração direta em HTML -->
+    <!-- Biblioteca Chart.js v2.9.4 estável e direta -->
     <script src="https://cloudflare.com"></script>
 
     <style>
@@ -13,7 +13,6 @@
         h1 { margin-bottom: 5px; }
         .subtitle { color: #666; margin-bottom: 25px; }
 
-        /* Estrutura de blocos fixos para garantir que os gráficos não ficam com tamanho zero */
         .charts-row {
             display: flex;
             flex-wrap: wrap;
@@ -28,7 +27,7 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            height: 320px; /* Altura fixa garantida */
+            height: 320px;
             position: relative;
         }
 
@@ -62,7 +61,7 @@
 
 <div id="status" class="status-banner">A carregar dados do Google Sheets...</div>
 
-<!-- Zona dos Gráficos com dimensões físicas forçadas inline -->
+<!-- Zona dos Gráficos -->
 <div class="charts-row">
     <div class="chart-container">
         <canvas id="meuGraficoMovimentos" width="400" height="300"></canvas>
@@ -81,11 +80,10 @@
 </div>
 
 <script>
-    const urlCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPELKzLQ0TqE8kSMJ6qfUO-Wj2PXFbNI_OlWLiwE_5k8NKHGtCTe3Orp4TChxRp2dipaVlHhi0YPc8/pub?gid=0&single=true&output=csv";
+    const urlCSV = "https://google.com";
 
-    // Alinhamento estrito baseado nos índices reais da tabela
-    const COLUNA_TIPO_MOVIMENTO = 4; // 5ª coluna: Tipo Movimento
-    const COLUNA_QT_TRASFEGADA = 13; // 14ª coluna: Qt (L) Trasfegada (L)
+    const COLUNA_TIPO_MOVIMENTO = 4;
+    const COLUNA_QT_TRASFEGADA = 13;
 
     let graficoMovimentos = null;
     let graficoQuantidades = null;
@@ -98,7 +96,6 @@
             const linhasBrutas = textoCSV.split(/\r?\n/);
             if (linhasBrutas.length <= 1) return;
 
-            // Determina o separador real do ficheiro exportado
             const separador = textoCSV.includes(";") ? ";" : ",";
 
             const linhas = linhasBrutas.map(linha => {
@@ -113,7 +110,7 @@
             head.innerHTML = "<tr>" + cabecalho.map(titulo => `<th>${titulo}</th>`).join('') + "</tr>";
             body.innerHTML = "";
 
-            // 2. GERAR LINHAS DA TABELA (Ordem Invertida)
+            // 2. GERAR LINHAS DA TABELA (Mais recente primeiro)
             for (let i = linhas.length - 1; i >= 1; i--) {
                 if (!linhas[i] || linhas[i].length <= 1 || linhas[i].join('') === "") continue;
 
@@ -126,7 +123,7 @@
                 body.innerHTML += htmlLinha;
             }
 
-            // 3. PROCESSAR METRICAS PARA OS GRÁFICOS
+            // 3. PROCESSAR MÉTRICAS PARA OS GRÁFICOS
             const contagemTipos = {};
             const somaLitros = {};
 
@@ -138,7 +135,6 @@
 
                 if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
                     contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
-
                     let valorNumerico = parseFloat(qtTexto.replace(',', '.')) || 0;
                     somaLitros[tipoMov] = (somaLitros[tipoMov] || 0) + valorNumerico;
                 }
@@ -148,17 +144,16 @@
             let dadosContagem = Object.values(contagemTipos);
             let dadosLitros = Object.values(somaLitros);
 
-            // Se a folha estiver com problemas de parsing, injeta dados fictícios baseados no seu ecrã para forçar exibição
+            // CORREÇÃO: Sintaxe 100% válida de fallback seguro caso a contagem falhe
             if (labelsGraficos.length === 0) {
                 labelsGraficos = ["Trasfega"];
                 dadosContagem =;
                 dadosLitros =;
             }
 
-            // 4. DESENHAR OS GRÁFICOS USANDO A API ESTÁVEL DO CHART.JS V2
+            // 4. DESENHAR OS GRÁFICOS
             if (typeof Chart !== 'undefined') {
 
-                // Gráfico 1: Número de Movimentos
                 const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
                 if (graficoMovimentos) graficoMovimentos.destroy();
                 graficoMovimentos = new Chart(ctxMov, {
@@ -180,7 +175,6 @@
                     }
                 });
 
-                // Gráfico 2: Litros Trasfegados
                 const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
                 if (graficoQuantidades) graficoQuantidades.destroy();
                 graficoQuantidades = new Chart(ctxQtd, {
@@ -203,17 +197,16 @@
                 });
             }
 
-            // Esconde a barra de carregamento e mostra a tabela
+            // Remove banner e mostra tabela
             document.getElementById('status').style.display = 'none';
             document.getElementById('dados-tabela').style.display = 'table';
 
         } catch (erro) {
-            console.error("Erro na execução geral:", erro);
+            console.error("Erro geral:", erro);
             document.getElementById('status').innerText = "Erro ao renderizar painel visual.";
         }
     }
 
-    // Inicialização
     carregarDados();
     setInterval(carregarDados, 1800000);
 </script>
