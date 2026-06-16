@@ -91,8 +91,20 @@ for (let i = linhas.length - 1; i >= 1; i--) {
         }
     }
 
-    // Executa a função ao abrir a página
+    // 1. Executa a função imediatamente ao abrir a página pela primeira vez
+carregarDados();
+
+// 2. Configura o temporizador para atualizar sozinho (30 minutos = 1800000 milissegundos)
+setInterval(function() {
+    console.log("A atualizar dados automaticamente...");
+
+    const status = document.getElementById('status');
+    status.innerText = "A atualizar dados...";
+    status.style.display = 'block';
+
     carregarDados();
+}, 1800000);
+
 </script>
 </body>
 </html>
