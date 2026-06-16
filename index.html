@@ -142,7 +142,7 @@
                 if (!linhas[i] || linhas[i].length <= Math.max(COLUNA_TIPO_MOVIMENTO, COLUNA_QT_TRASFEGADA)) continue;
 
                 let tipoMov = linhas[i][COLUNA_TIPO_MOVIMENTO] ? linhas[i][COLUNA_TIPO_MOVIMENTO].replace(/"/g, '').trim() : "";
-                let qtTexto = xls = linhas[i][COLUNA_QT_TRASFEGADA] ? linhas[i][COLUNA_QT_TRASFEGADA].replace(/"/g, '').trim() : "";
+                let qtTexto = linhas[i][COLUNA_QT_TRASFEGADA] ? linhas[i][COLUNA_QT_TRASFEGADA].replace(/"/g, '').trim() : "";
 
                 if (tipoMov && tipoMov !== "Selecione..." && tipoMov !== "") {
                     contagemTipos[tipoMov] = (contagemTipos[tipoMov] || 0) + 1;
