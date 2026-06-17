@@ -160,6 +160,7 @@
 
             if (typeof Chart !== 'undefined') {
                 // Gráfico 1: Movimentos (Azul)
+                Chart.defaults.font.family = "'Inter', sans-serif";
                 const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
                 if (graficoMovimentos) graficoMovimentos.destroy();
                 graficoMovimentos = new Chart(ctxMov, {
@@ -182,7 +183,11 @@
                             },
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                        scales:
+                        {x: { grid: { display: false } // <- REMOVE AS LINHAS VERTICAIS
+                            },
+                        y: { beginAtZero: true, grid: { display: false },
+                        ticks: { precision: 0 } } }
                     }
                 });
 
@@ -209,7 +214,11 @@
                         },
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: { y: { beginAtZero: true } }
+                        scales:
+                        {x: { grid: { display: false } // <- REMOVE AS LINHAS VERTICAIS
+                            },
+                        y: { beginAtZero: true, grid: { display: false },
+                        ticks: { precision: 0 } } }
                     }
                 });
 
@@ -254,7 +263,11 @@
                           },
                         responsive: true,
                         maintainAspectRatio: false,
-                        scales: { y: { beginAtZero: true } }
+                        scales:
+                        {x: { grid: { display: false } // <- REMOVE AS LINHAS VERTICAIS
+                            },
+                        y: { beginAtZero: true, grid: { display: false },
+                        ticks: { precision: 0 } } }
                     }
                 });
             }
