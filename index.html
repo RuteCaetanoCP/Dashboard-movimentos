@@ -96,45 +96,42 @@
             }
             body.innerHTML = htmlBody;
 
-            let colMovimento = 4;
-            let colVinho = 11;
-            let colQuantidade = 13;
-
-            for(let j = 0; j < cabecalho.length; j++) {
-                let nomeCol = cabecalho[j].toString().toLowerCase().trim();
-                if(nomeCol.includes("tipo movimento")) colMovimento = j;
-                if(nomeCol.includes("tipo vinho") || nomeCol === "vinho") colVinho = j;
-                if(nomeCol.includes("qt") || nomeCol.includes("trasfegada")) colQuantidade = j;
-            }
+            // 1. ÍNDICES FIXOS CONTROLADOS (Evita erros por quebras de texto)
+            const colMovimento = 4;   // Tipo Movimento
+            const colVinho = 10;      // Tipo Vinho (Índice 11 da lista)
+            const colQuantidade = 13; // Qt (L) Trasfegada (L)
 
             const contagemTipos = {};
             const somaLitros = {};
             const somaLitrosVinho = {};
-    for (let i = 1; i < linhas.length; i++) {
-                if (!linhas[i] || linhas[i].length <= Math.max(colMovimento, colQuantidade, colVinho)) continue;
 
-                let tipo = linhas[i][colMovimento];
-                let vinho = linhas[i][colVinho];
-                let qtdTexto = linhas[i][colQuantidade];
+            // 2. PROCESSAMENTO E SOMA DE DADOS COM AS CORREÇÕES DE SINTAXE
+            for (let i = 1; i < linhas.length; i++) {
+                if (!linhas[i] || linhas[i].length <= 13) continue;
 
-                let qtdLimpa = (qtdTexto || "").toString().replace(/\s+/g,'').replace(/\./g,'').replace(',', '.');
+                let tipo = linhas[i][colMovimento] ? linhas[i][colMovimento].trim() : "";
+                let vinho = linhas[i][colVinho] ? linhas[i][colVinho].trim() : "";
+                let qtdTexto = linhas[i][colQuantidade] ? linhas[i][colQuantidade].trim() : "";
+
+                // Remove espaços invisíveis ou formatações especiais do Sheets
+                let qtdLimpa = qtdTexto.replace(/[^0-9,.]/g, '').replace(',', '.');
                 let valor = parseFloat(qtdLimpa) || 0;
 
-                if (tipo && tipo !== "Selecione..." && tipo !== "") {
-                    tipo = tipo.trim();
+                if (tipo !== "" && tipo !== "Selecione...") {
+                    // CORREÇÃO 2: Retificados os parênteses por parênteses retos [tipo]
                     contagemTipos[tipo] = (contagemTipos[tipo] || 0) + 1;
                     somaLitros[tipo] = (somaLitros[tipo] || 0) + valor;
                 }
 
-                if (vinho && vinho !== "Selecione..." && vinho !== "") {
-                    vinho = vinho.trim();
+                if (vinho !== "" && vinho !== "Selecione...") {
                     somaLitrosVinho[vinho] = (somaLitrosVinho[vinho] || 0) + valor;
                 }
             }
 
-            let labelsMov = Object.keys(contagemTipos);
-            let dadosContagem = Object.values(contagemTipos);
-            let dadosLitros = Object.values(somaLitros);
+            // 3. ESTRUTURAÇÃO RIGOROSA DOS EIXOS
+            let labelsMov = ["Trasfega", "Entrada"];
+            let dadosContagem = labelsMov.map(k => contagemTipos[k] || 0);
+            let dadosLitros = labelsMov.map(k => somaLitros[k] || 0);
 
             if (labelsMov.length === 0) {
                 labelsMov = ["Sem Movimentos"];
@@ -142,15 +139,17 @@
                 dadosLitros = [];
             }
 
-            let labelsVinho = Object.keys(somaLitrosVinho);
-            let dadosVinhoLitros = Object.values(somaLitrosVinho);
+            // CORREÇÃO 1: Removida a segunda declaração duplicada das linhas 156-157
+            let labelsVinho = Object.keys(somaLitrosVinho).filter(k => k !== "");
+            let dadosVinhoLitros = labelsVinho.map(k => somaLitrosVinho[k] || 0);
 
             if (labelsVinho.length === 0) {
                 labelsVinho = ["Sem Vinhos"];
-                dadosVinhoLitros =[];
+                dadosVinhoLitros = [];
             }
 
             if (typeof Chart !== 'undefined') {
+                // Gráfico 1: Movimentos (Azul)
                 const ctxMov = document.getElementById('meuGraficoMovimentos').getContext('2d');
                 if (graficoMovimentos) graficoMovimentos.destroy();
                 graficoMovimentos = new Chart(ctxMov, {
@@ -172,6 +171,7 @@
                     }
                 });
 
+                // Gráfico 2: Quantidades por Movimento (Verde)
                 const ctxQtd = document.getElementById('meuGraficoQuantidades').getContext('2d');
                 if (graficoQuantidades) graficoQuantidades.destroy();
                 graficoQuantidades = new Chart(ctxQtd, {
@@ -193,6 +193,7 @@
                     }
                 });
 
+                // Gráfico 3: Quantidades por Tipo de Vinho (Roxo)
                 const ctxVinho = document.getElementById('meuGraficoVinhoQuantidades').getContext('2d');
                 if (graficoVinhoQuantidades) graficoVinhoQuantidades.destroy();
                 graficoVinhoQuantidades = new Chart(ctxVinho, {
@@ -227,5 +228,7 @@
     carregarDados();
     setInterval(carregarDados, 1800000);
 </script>
+
+
 </body>
 </html>
