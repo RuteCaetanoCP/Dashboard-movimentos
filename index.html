@@ -16,7 +16,7 @@
         .chart-container { flex: 1; min-width: 320px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 320px; position: relative; }
         .table-container { overflow-x: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-top: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; text-align: center; vertical-align: middle; border-bottom: 1px solid #ddd; white-space: nowrap; }
+        th, td { padding: 12px; text-align: center; ; vertical-align: middle; border-bottom: 1px solid #ddd; white-space: nowrap; }
         th { background-color: #007bff; color: white; position: sticky; top: 0; }
         tr:hover { background-color: #f8f9fa; }
         .status-banner { background-color: #e2e3e5; padding: 10px 15px; border-radius: 5px; display: inline-block; font-weight: bold; margin-bottom: 20px; }
@@ -193,9 +193,25 @@
                     }
                 });
 
-                // Gráfico 3: Quantidades por Tipo de Vinho (Roxo)
-                const ctxVinho = document.getElementById('meuGraficoVinhoQuantidades').getContext('2d');
+                // Gráfico 3: Quantidades por Tipo de Vinho
+              const ctxVinho = document.getElementById('meuGraficoVinhoQuantidades').getContext('2d');
                 if (graficoVinhoQuantidades) graficoVinhoQuantidades.destroy();
+
+                // Atribuição de bordeaux para Tinto e rosa para Rosé
+                const coresFundo = labelsVinho.map(v => {
+                    let n = v.toLowerCase().trim();
+                    if (n.includes("tinto")) return 'rgba(128, 0, 32, 0.7)';
+                    if (n.includes("rosé") || n.includes("rose")) return 'rgba(255, 182, 193, 0.7)';
+                    return 'rgba(153, 102, 255, 0.6)';
+                });
+
+                const coresBorda = labelsVinho.map(v => {
+                    let n = v.toLowerCase().trim();
+                    if (n.includes("tinto")) return '#4A0014';
+                    if (n.includes("rosé") || n.includes("rose")) return '#FFB6C1';
+                    return '#9966ff';
+                });
+
                 graficoVinhoQuantidades = new Chart(ctxVinho, {
                     type: 'bar',
                     data: {
@@ -203,8 +219,8 @@
                         datasets: [{
                             label: 'Quantidade Total por Tipo de Vinho (L)',
                             data: dadosVinhoLitros,
-                            backgroundColor: 'rgba(153, 102, 255, 0.6)',
-                            borderColor: '#9966ff',
+                            backgroundColor: coresFundo,
+                            borderColor: coresBorda,
                             borderWidth: 1
                         }]
                     },
@@ -228,7 +244,6 @@
     carregarDados();
     setInterval(carregarDados, 1800000);
 </script>
-
 
 </body>
 </html>
